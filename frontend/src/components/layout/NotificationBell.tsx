@@ -22,10 +22,10 @@ export function NotificationBell() {
   }, [open])
 
   return (
-    <div ref={ref} className="relative inline-flex items-center">
+    <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="relative inline-flex items-center text-text-secondary hover:text-brand transition-colors"
+        className="relative text-text-secondary hover:text-brand transition-colors"
         aria-label="Notifications"
         title="Notifications"
       >
