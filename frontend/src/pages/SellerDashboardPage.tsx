@@ -104,7 +104,7 @@ export default function SellerDashboardPage() {
                 <Link
                   key={shop.shop_id}
                   to={`/seller/shops/${shop.shop_id}/items`}
-                  className="bg-surface-alt rounded-xl border border-border shadow-sm p-4 md:p-8 flex flex-col gap-5 cursor-pointer transition-transform hover:-translate-y-1 hover:shadow-lg"
+                  className="bg-surface-alt rounded-xl border border-border shadow-sm p-8 flex flex-col gap-5 cursor-pointer transition-transform hover:-translate-y-1 hover:shadow-lg"
                 >
                   {/* Shop header */}
                   <div className="flex items-start justify-between">

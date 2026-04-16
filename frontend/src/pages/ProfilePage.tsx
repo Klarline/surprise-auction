@@ -286,11 +286,12 @@ function BidsTab({ user, token }: { user: { user_id: string }; token: string | n
           {bids.map((bid) => {
             const paymentStatus = bid.status === 'WON' ? paymentsByAuction.get(bid.auction_id) : undefined
             const showLinks = paymentStatus === 'completed'
+            const hasActions = bid.status === 'WON'
             return (
               <Link
                 key={bid.bid_id}
                 to={`/auction/${bid.auction_id}`}
-                className="px-5 py-5 flex flex-col gap-1.5 bg-surface-alt rounded-xl border border-border shadow-sm cursor-pointer transition-transform hover:-translate-y-1 hover:shadow-lg"
+                className={`px-5 pt-5 ${hasActions ? 'pb-4' : 'pb-5'} flex flex-col bg-surface-alt rounded-xl border border-border shadow-sm cursor-pointer transition-transform hover:-translate-y-1 hover:shadow-lg`}
               >
                 {/* Row 1: shop name ↔ price */}
                 <div className="flex items-baseline justify-between">
@@ -302,28 +303,30 @@ function BidsTab({ user, token }: { user: { user_id: string }; token: string | n
                   <p className="font-sans font-medium text-lg text-text-primary">{bid.item_title}</p>
                   <Badge status={bid.status} />
                 </div>
-                {/* Row 3: time ago ↔ links */}
+                {/* Row 3: time ago */}
                 <div className="flex items-center justify-between">
                   <p className="text-text-secondary text-sm">{timeAgo(bid.timestamp)}</p>
-                  {showLinks && (
-                    <div className="flex items-center gap-4">
-                      <Link
-                        to={`/payment/auction/${bid.auction_id}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-brand text-sm font-medium hover:underline"
-                      >
-                        View Payment →
-                      </Link>
-                      <Link
-                        to={`/reviews/new?auction_id=${bid.auction_id}&shop_id=${bid.shop_id}&shop_name=${encodeURIComponent(bid.shop_name)}&item_title=${encodeURIComponent(bid.item_title)}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-text-secondary text-sm font-medium hover:text-brand hover:underline transition-colors"
-                      >
-                        Leave a Review →
-                      </Link>
-                    </div>
-                  )}
                 </div>
+
+                {/* Actions footer */}
+                {hasActions && (
+                  <div className="flex items-center justify-end gap-4 mt-3">
+                    <Link
+                      to={`/payment/auction/${bid.auction_id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-brand text-sm font-medium hover:underline"
+                    >
+                      View Payment →
+                    </Link>
+                    <Link
+                      to={`/reviews/new?auction_id=${bid.auction_id}&shop_id=${bid.shop_id}&shop_name=${encodeURIComponent(bid.shop_name)}&item_title=${encodeURIComponent(bid.item_title)}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-text-secondary text-sm font-medium hover:text-brand hover:underline transition-colors"
+                    >
+                      Leave a Review →
+                    </Link>
+                  </div>
+                )}
               </Link>
             )
           })}
