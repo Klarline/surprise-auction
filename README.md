@@ -2,9 +2,9 @@
 
 A microservices platform where local stores auction surplus items in short live windows. Buyers compete in real-time bidding, and winners are charged automatically when the auction closes.
 
-Built for a distributed systems course, with a focus on **concurrent bid processing**, **horizontal scaling**, and **real-time notification fan-out**.
+Built with a focus on **concurrent bid processing**, **horizontal scaling**, and **real-time notification fan-out**.
 
-The repository supports both local development with Docker Compose and cloud experiments on AWS ECS Fargate.
+The repository supports both local development with Docker Compose and cloud deployment on AWS ECS Fargate.
 
 ---
 
@@ -306,41 +306,60 @@ All defaults are pre-configured in `docker-compose.yml`.
 ## Running Tests
 
 ```bash
+# Unit tests
 go test ./...
+
+# Smoke tests (requires running Docker services)
+chmod +x tests/smoke_test.sh
+./tests/smoke_test.sh
 ```
 
 ---
 
-## Research Experiments
+## Cloud Deployment (AWS ECS Fargate)
 
-### 1. Bid Contention Under Load
-Simulate 500 concurrent users bidding on the same auction in its final 10 seconds. Compare the three concurrency strategies on:
-- Successful vs. rejected bid rate
-- Average bid latency and P95/P99
-- Consistency violations (lower bid winning)
+Infrastructure is managed with Terraform in the `infra/` directory.
 
-### 2. Horizontal Scaling During Auction Spikes
-Simulate a rush-hour spike in which 50 auctions go live simultaneously and each attracts 100 bidders, using AWS ECS Fargate capacity managed with a layered scaling strategy:
-- conservative Terraform defaults of `2` tasks and `3000 req/target/min` for initial bring-up
-- a validated experiment baseline of `4` tasks and `2000 req/target/min`
-- optional scheduled prewarm to `8` tasks for predictable spike windows, with `ALBRequestCountPerTarget` retained as the reactive fallback
+```
+Internet → ALB (path-based routing)
+              ├── /auctions*           → auction service  (8081)
+              ├── /auctions/*/bids*    → bid service      (8084)
+              ├── /auctions/*/payment* → payment service  (8085)
+              ├── /users*              → user service     (8082)
+              ├── /shops*, /items*     → shop service     (8083)
+              ├── /ws*, /notifications*→ notification svc (8080)
+              └── /*                  → frontend          (3000)
 
-Measure:
-- Auto-scaling response time
-- Latency during the scale-up window
-- Throughput before and after new capacity becomes available
-- Bids lost during scaling transitions
+All services → ElastiCache Redis (streams + auction state)
+user/shop/payment/auction → DynamoDB (persistent store)
+shop → S3 (image uploads)
+```
 
-### 3. Notification Fan-Out
-Simulate 1000 clients watching a single popular auction with rapid bid updates. Split the study into two parts:
-- Experiment 3A: compare push transports for one-way auction updates (`WebSocket` vs `SSE`)
-- Experiment 3B: compare architectural trade-offs between push delivery and pull polling
+**Deploy:**
 
-Measure:
-- Delivery latency and connection behavior for `WebSocket` vs `SSE`
-- HTTP load and stale-read risk for push vs polling
+```bash
+cd infra
+terraform init
+terraform apply -var="jwt_secret=<your-secret>"
+```
 
-Current local result summary (3 runs per mode, 999 subscribers + 1 bidder, 180s each):
-- `WebSocket`: faster connection setup and lower server-side fan-out latency on average
-- `SSE`: comparable push behavior with lower average client-observed latency, but less stable connection tails
-- `Polling`: about `164k` extra HTTP reads per run, confirming the cost of pull-based updates
+**Push images:**
+
+```bash
+aws ecr get-login-password | docker login --username AWS --password-stdin \
+  $(terraform output -raw ecr_repos | python3 -c "import sys,json; r=json.load(sys.stdin); print(list(r.values())[0].split('/')[0])")
+
+for svc in auction user shop bid payment notification frontend; do
+  docker build -t rtb/$svc -f services/$svc/Dockerfile .
+  docker tag rtb/$svc $(terraform output -json ecr_repos | python3 -c "import sys,json; print(json.load(sys.stdin)['$svc'])")
+  docker push $(terraform output -json ecr_repos | python3 -c "import sys,json; print(json.load(sys.stdin)['$svc'])")
+done
+```
+
+**Verify:**
+
+```bash
+curl $(terraform output -raw alb_url)/auctions
+```
+
+The auction service supports autoscaling via `ALBRequestCountPerTarget` target tracking, with optional scheduled prewarm for predictable traffic spikes. See `infra/variables.tf` for tunable parameters.
